@@ -11,22 +11,25 @@ Adafruit_SSD1306 display(OLED_RESET);
 
 tmElements_t tm;
 
-void setup(){                
+void setup(){  
+  //setup OLED
   Serial.begin(9600);
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.display();
-  delay(2000);
-  display.clearDisplay();    
-  
-  LEDprint(2, WHITE, 10, 17, "PUPASOFT");
-  delay(800);
-  display.clearDisplay();  
+  delay(1000);
+  display.clearDisplay();      
 }
 
-void loop(){  
+void loop(){ 
+  //date and time
   printDate();
   printTime();  
-  LEDprint(2, WHITE, 10, 17, "ATTACH RFID TO UNLOCK"); 
+  
+  //screen message
+  LEDprint(2, 30, 17, "ATTACH");
+  LEDprint(2, 30, 40, "RFCARD");  
+  
+  //delay 1 minute and update time  
   delay(60000);
   display.clearDisplay();
 }
@@ -65,7 +68,7 @@ void printTime(){
   
   display.setTextSize(1);
   display.setTextColor(WHITE);
-  display.setCursor(1, 1);
+  display.setCursor(90, 1);
   
   print2digits(tm.Hour);    
   display.write(':');    
@@ -73,16 +76,12 @@ void printTime(){
   print2digits(tm.Minute);
 }
 
-void LEDprint(int textsize, byte *textcolor, int cursorX, int cursorY, char *text){
+void LEDprint(int textsize, int cursorX, int cursorY, char *text){
   display.setTextSize(textsize);
-  display.setTextColor(textcolor);
+  display.setTextColor(WHITE);
   display.setCursor(cursorX, cursorY);
-  display.println("%s", text);
+  display.println(text);
   display.display();
 }
-  
-  
-  
-
   
   
