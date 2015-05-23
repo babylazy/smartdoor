@@ -17,21 +17,18 @@ void setup(){
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.display();
   delay(1000);
-  display.clearDisplay();      
-}
-
-void loop(){ 
+  display.clearDisplay(); 
   //date and time
   printDate();
   printTime();  
-  
+}
+
+void loop(){   
   //screen message
   LEDprint(2, 30, 17, "ATTACH");
   LEDprint(2, 30, 40, "RFCARD");  
-  
-  //delay 1 minute and update time  
-  delay(60000);
-  display.clearDisplay();
+  //update time
+  updateTime(tm.Minute);
 }
 
 void print2digits(int number) {
@@ -43,12 +40,15 @@ void print2digits(int number) {
 }
 
 void printDate(){
+  //get date from RTC
   RTC.read(tm);
   
+  //set up text to display
   display.setTextSize(1);
   display.setTextColor(WHITE);
   display.setCursor(1, 1);
   
+  //display dd/mm/yy
   display.print(tm.Day);    
   display.display();
   display.write('/');    
@@ -59,17 +59,18 @@ void printDate(){
   display.display();
   display.print(tmYearToCalendar(tm.Year));    
   display.display();
-  display.print("      ");
-  display.display();
 }
 
 void printTime(){
+  //get time from RTC
   RTC.read(tm);
   
+  //set up text to display
   display.setTextSize(1);
   display.setTextColor(WHITE);
   display.setCursor(90, 1);
   
+  //display hh:mm
   print2digits(tm.Hour);    
   display.write(':');    
   display.display();
@@ -83,5 +84,15 @@ void LEDprint(int textsize, int cursorX, int cursorY, char *text){
   display.println(text);
   display.display();
 }
+  
+void updateTime(int currentMinute){
+  RTC.read(tm);
+  if(currentMinute != tm.Minute){
+    display.clearDisplay();  
+    printDate();
+    printTime();
+  }
+}
+  
   
   
