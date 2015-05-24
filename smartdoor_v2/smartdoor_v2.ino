@@ -14,6 +14,9 @@ Adafruit_SSD1306 display(OLED_RESET);
 tmElements_t tm;
 File sdcard;
 
+byte code[12];  //12 + 4 (RF_XXXXXXXXXXXX\0)
+int ci = 0;
+
 void setup() {
   Serial.begin(9600); 
   Serial1.begin(9600);
@@ -21,10 +24,8 @@ void setup() {
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.display();
   delay(1000);
-  display.clearDisplay();  
-  //date and time
-  printDate();
-  printTime();
+  display.clearDisplay(); 
+  UI();  
   
   //SD card
   pinMode(SS,OUTPUT);
@@ -44,43 +45,28 @@ void setup() {
 
 unsigned long rfid_stamp = 0;
 unsigned long serial2_stamp = 0;
-void loop(){ 
-    
-  
-  //screen message
-  LEDprint(2, 30, 17, "ATTACH");
-  LEDprint(2, 30, 40, "RFCARD");  
-  
-  //update time
+void loop(){  
   updateTime(tm.Minute);
   
-  //delay 1 minute and update time  
-  delay(60000);
-  display.clearDisplay();
-
-}
-
-byte code[12];  //12 + 4 (RF_XXXXXXXXXXXX\0)
-int ci = 0;  
-void serialEvent1(){
-      byte bytesRead = 0;
-      byte val = 0;
-      while(Serial1.available() > 0 && bytesRead < 16) { //make sure while not run indefinitely
-          val = Serial1.read();
-          bytesRead++;
+  //rfid
+  byte bytesRead = 0;
+  byte val = 0;
+  while(Serial1.available() > 0 && bytesRead < 16) { //make sure while not run indefinitely
+  val = Serial1.read();
+  bytesRead++;
           
-          if(val == 0x02){
-            ci = 0;
-          }else if(val == 0x0D || val == 0x0A){ //ignore \r\n
-            continue;
-          }else if(val == 0x03){
-            process_code();
-            break;
-          }else if(ci < 12) {  
-            code[ci++] = val;
-          }
-        }
-}
+  if(val == 0x02){
+     ci = 0;
+  }else if(val == 0x0D || val == 0x0A){ //ignore \r\n
+     continue;
+  }else if(val == 0x03){
+     process_code();
+     break;
+  }else if(ci < 12) {  
+     code[ci++] = val;
+  }
+  }  
+}  
       
 void process_code() {
   byte checksum = hexstr2b(code[10], code[11]);
@@ -96,8 +82,10 @@ void process_code() {
     rfid_stamp = millis();
     //show RFID to monitor
     for(i = 0; i < 12 ; i++){
-      Serial.println(code[i]);
-    }
+      Serial.print(code[i],HEX);
+      Serial.print(" ");
+    } 
+    Serial.println();
     //check access
     if(check_IDAccess((char*)code)){
       digitalWrite(5,HIGH);
@@ -116,8 +104,10 @@ void print2digits(int number) {
   display.display();
 }
 
-void printDate(){
+void printDateAndTime(){
   RTC.read(tm);
+  
+  display.clearDisplay();
   
   display.setTextSize(1);
   display.setTextColor(WHITE);
@@ -135,13 +125,7 @@ void printDate(){
   display.display();
   display.print("      ");
   display.display();
-}
-
-void printTime(){
-  RTC.read(tm);
   
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
   display.setCursor(90, 1);
   
   print2digits(tm.Hour);    
@@ -151,29 +135,55 @@ void printTime(){
 }
 
 void LEDprint(int textsize, int cursorX, int cursorY, char *text){
+  //clear screen
+  printDateAndTime();
+  
+  //print text
   display.setTextSize(textsize);
   display.setTextColor(WHITE);
   display.setCursor(cursorX, cursorY);
   display.println(text);
   display.display();
+  
+  delay(1000);
+  UI();
 }
 
 void updateTime(int currentMinute){
   RTC.read(tm);
   if(currentMinute != tm.Minute){
-    display.clearDisplay();  
-    printDate();
-    printTime();
+    //date and time  
+    printDateAndTime();
+    //screen message
+    display.setTextSize(2);
+    display.setTextColor(WHITE);
+    display.setCursor(30, 17);
+    display.println("ATTACH");
+    display.display();
+    display.setCursor(30, 40);
+    display.println("RFCARD");
+    display.display();
   }
 }
 
+void UI(){ 
+  //date and time
+  printDateAndTime();
+  //screen message
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+  display.setCursor(30, 17);
+  display.println("ATTACH");
+  display.display();
+  display.setCursor(30, 40);
+  display.println("RFCARD");
+  display.display();    
+}  
+
 boolean check_IDAccess(char* code){
-    // redisplay prepare for show access
-    display.clearDisplay();
-    printDate();
-    printTime(); 
-    
     //check id to allow access
+    Serial.print("Code in Check: ");
+    Serial.println(code);
     while(sdcard.available()){
       char* id = read_id();
       if(!strcmp(id,code)){
