@@ -19,7 +19,6 @@ File sdcard;
 byte code[12];  //10+2 XXXXXXXXXX\r\0)    // X = ASCII of char
 int ci = 0;
 char user[MEMBER][12];
-char oled_display[30];
 
 void setup() {
   Serial.begin(9600); 
@@ -194,8 +193,7 @@ void LEDprint(char *text){
   //print text
   display.setTextSize(2);
   display.setTextColor(WHITE);
-  strcpy(oled_display,text);
-  if(!strcmp(display,"reset")){
+  if(!strcmp(text,"reset")){
     display.setCursor(30, 17);
     display.println("ATTACH");
     display.display();
@@ -205,7 +203,7 @@ void LEDprint(char *text){
   }
   else{
     display.setCursor(30, 17);
-    display.println(display);
+    display.println(text);
     display.display();
   }
 }
@@ -227,7 +225,7 @@ void updateTime(int currentMinute){
 //    display.display();
   }
 }
-
+/*
 void UI(){ 
   //date and time
   printDateAndTime();
@@ -241,7 +239,7 @@ void UI(){
   display.println("RFCARD");
   display.display();
 }  
-
+*/
 //------utilities functions-------------
 byte hexstr2b(char a, char b){
   return (byte)((hexchar2b(a) * 16) + hexchar2b(b));
