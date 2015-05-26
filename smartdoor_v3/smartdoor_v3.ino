@@ -15,6 +15,7 @@ tmElements_t tm;
 File sdcard;
 
 #define MEMBER 2
+#define DOOR 5
 
 byte code[12];  //10+2 XXXXXXXXXX\r\0)    // X = ASCII of char
 int ci = 0;
@@ -45,7 +46,7 @@ void setup() {
   }
   
   //set pin for controlling RFID
-  pinMode(5 , OUTPUT);
+  pinMode(DOOR , OUTPUT);
 }
 
 unsigned long rfid_stamp = 0;
@@ -125,7 +126,6 @@ void read_file(char *path){
    Serial.println("Already read text file.");
    Serial.println("Text : ");
    for(int i = 0 ; i < MEMBER ; i++){
-//     trimwhitespace(user[i]);
      Serial.println(user[i]);
    }
    Serial.println("==============================");
@@ -141,10 +141,10 @@ boolean isUser(){
 }
 
 void unlock_door(){
-  digitalWrite(5,HIGH);
+  digitalWrite(DOOR,HIGH);
   Serial.println("The door is unlock.");
   delay(5000);
-  digitalWrite(5,LOW);
+  digitalWrite(DOOR,LOW);
   Serial.println("The door is lock.");
 }
 
@@ -215,31 +215,9 @@ void updateTime(int currentMinute){
     printDateAndTime();
     //screen message
     LEDprint("reset");
-//    display.setTextSize(2);
-//    display.setTextColor(WHITE);
-//    display.setCursor(30, 17);
-//    display.println("ATTACH");
-//    display.display();
-//    display.setCursor(30, 40);
-//    display.println("RFCARD");
-//    display.display();
   }
 }
-/*
-void UI(){ 
-  //date and time
-  printDateAndTime();
-  //screen message
-  display.setTextSize(2);
-  display.setTextColor(WHITE);
-  display.setCursor(30, 17);
-  display.println("ATTACH");
-  display.display();
-  display.setCursor(30, 40);
-  display.println("RFCARD");
-  display.display();
-}  
-*/
+
 //------utilities functions-------------
 byte hexstr2b(char a, char b){
   return (byte)((hexchar2b(a) * 16) + hexchar2b(b));
