@@ -1,4 +1,4 @@
-// include function to read rfid
+// include function to check access from text file
 
 #include <SPI.h>
 #include <Wire.h>
@@ -14,8 +14,12 @@ Adafruit_SSD1306 display(OLED_RESET);
 tmElements_t tm;
 File sdcard;
 
-byte code[12];  //12 + 4 (RF_XXXXXXXXXXXX\0)
+#define MEMBER 2
+
+byte code[12];  //10+2 XXXXXXXXXX\r\0)    // X = ASCII of char
 int ci = 0;
+char user[MEMBER][12];
+char oled_display[30];
 
 void setup() {
   Serial.begin(9600); 
@@ -25,7 +29,7 @@ void setup() {
   display.display();
   delay(1000);
   display.clearDisplay(); 
-  UI();  
+  LEDprint("reset");  
   
   //SD card
   pinMode(SS,OUTPUT);
@@ -35,37 +39,40 @@ void setup() {
   }
   if(SD.exists("idaccess.txt")){
     Serial.println("Founded idaccess");
+    read_file("idaccess.txt"); // get ID from file "idaccess.txt"  to user[][]
   }
   else{
-    Serial.println("Cannot find IDACCESS.TXT");
+    Serial.println("Cannot find idaccess.txt");
   }
+  
   //set pin for controlling RFID
   pinMode(5 , OUTPUT);
 }
 
 unsigned long rfid_stamp = 0;
 unsigned long serial2_stamp = 0;
+
 void loop(){  
   updateTime(tm.Minute);
-  
   //rfid
   byte bytesRead = 0;
   byte val = 0;
   while(Serial1.available() > 0 && bytesRead < 16) { //make sure while not run indefinitely
-  val = Serial1.read();
-  bytesRead++;
-          
-  if(val == 0x02){
-     ci = 0;
-  }else if(val == 0x0D || val == 0x0A){ //ignore \r\n
-     continue;
-  }else if(val == 0x03){
-     process_code();
-     break;
-  }else if(ci < 12) {  
-     code[ci++] = val;
-  }
+      val = Serial1.read();
+      bytesRead++;
+              
+      if(val == 0x02){
+         ci = 0;
+      }else if(val == 0x0D || val == 0x0A){ //ignore \r\n
+         continue;
+      }else if(val == 0x03){
+         process_code();
+         break;
+      }else if(ci < 12) {  
+         code[ci++] = val;
+      }  
   }  
+  
 }  
       
 void process_code() {
@@ -77,25 +84,71 @@ void process_code() {
   }
   if(test == checksum){ //valid tag code
     code[10] = '\r';
-    code[11] = '\n';
+    code[11] = '\0';
     
     rfid_stamp = millis();
-    //show RFID to monitor
-    for(i = 0; i < 12 ; i++){
-      Serial.print(code[i],HEX);
-      Serial.print(" ");
-    } 
-    Serial.println();
-    //check access
-    if(check_IDAccess((char*)code)){
-      digitalWrite(5,HIGH);
-      LEDprint(2,30,17,"Pass");
-    }
-    else{
-      LEDprint(2,30,17,"Denied");
-    }
+    Serial.print("Code : ");
+    Serial.println((char*)code);
+    Serial.println("Already read RFID");
+    check_IDAccess();
   }
 }
+
+void check_IDAccess(){
+      if(isUser()){
+        LEDprint("Pass");
+        Serial.println("Pass");
+        unlock_door();
+        LEDprint("reset");
+      }else{
+        LEDprint("Denied");
+        Serial.println("Denied");
+      }  
+}
+
+void read_file(char *path){
+   char tmp;
+   int index=0;
+   int num = 0;
+   sdcard = SD.open(path);
+   while(sdcard.available()){
+       tmp = sdcard.read();
+       if(tmp == '\n'){
+           user[num][index] = '\0';
+           num++;
+           index = 0;
+       }else{
+         user[num][index] = tmp;
+         index++;
+       }     
+   }
+   sdcard.close();
+   Serial.println("Already read text file.");
+   Serial.println("Text : ");
+   for(int i = 0 ; i < MEMBER ; i++){
+//     trimwhitespace(user[i]);
+     Serial.println(user[i]);
+   }
+   Serial.println("==============================");
+}
+
+boolean isUser(){
+  for(int i =  0 ; i < MEMBER ; i++){
+      if(!strcmp(user[i],(char*)code)){
+          return true;
+      }
+  }
+  return false;
+}
+
+void unlock_door(){
+  digitalWrite(5,HIGH);
+  Serial.println("The door is unlock.");
+  delay(5000);
+  digitalWrite(5,LOW);
+  Serial.println("The door is lock.");
+}
+
 void print2digits(int number) {
   if (number >= 0 && number < 10) {
     display.write('0');
@@ -134,19 +187,27 @@ void printDateAndTime(){
   print2digits(tm.Minute);
 }
 
-void LEDprint(int textsize, int cursorX, int cursorY, char *text){
+void LEDprint(char *text){
   //clear screen
   printDateAndTime();
   
   //print text
-  display.setTextSize(textsize);
+  display.setTextSize(2);
   display.setTextColor(WHITE);
-  display.setCursor(cursorX, cursorY);
-  display.println(text);
-  display.display();
-  
-  delay(1000);
-  UI();
+  strcpy(oled_display,text);
+  if(!strcmp(display,"reset")){
+    display.setCursor(30, 17);
+    display.println("ATTACH");
+    display.display();
+    display.setCursor(30, 40);
+    display.println("RFCARD");
+    display.display();
+  }
+  else{
+    display.setCursor(30, 17);
+    display.println(display);
+    display.display();
+  }
 }
 
 void updateTime(int currentMinute){
@@ -155,14 +216,15 @@ void updateTime(int currentMinute){
     //date and time  
     printDateAndTime();
     //screen message
-    display.setTextSize(2);
-    display.setTextColor(WHITE);
-    display.setCursor(30, 17);
-    display.println("ATTACH");
-    display.display();
-    display.setCursor(30, 40);
-    display.println("RFCARD");
-    display.display();
+    LEDprint("reset");
+//    display.setTextSize(2);
+//    display.setTextColor(WHITE);
+//    display.setCursor(30, 17);
+//    display.println("ATTACH");
+//    display.display();
+//    display.setCursor(30, 40);
+//    display.println("RFCARD");
+//    display.display();
   }
 }
 
@@ -177,35 +239,8 @@ void UI(){
   display.display();
   display.setCursor(30, 40);
   display.println("RFCARD");
-  display.display();    
+  display.display();
 }  
-
-boolean check_IDAccess(char* code){
-    //check id to allow access
-    Serial.print("Code in Check: ");
-    Serial.println(code);
-    while(sdcard.available()){
-      char* id = read_id();
-      if(!strcmp(id,code)){
-        return true;
-      } 
-    }
-    return false;
-}
-
-char* read_id(){
-    char* id = (char*)malloc(sizeof(char)*12);
-    int index = 0;
-    if(sdcard.available()){
-      for(index = 0 ; index < 12 ; index++){
-         id[index] = sdcard.read();
-      }
-    }
-    return id;
-}
-
-
-
 
 //------utilities functions-------------
 byte hexstr2b(char a, char b){
