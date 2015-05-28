@@ -33,7 +33,6 @@ rfid pupa[MEMBER]; // pathern -> "<member_id> <member_name>\r\n"
 byte code[12];  //10+2 XXXXXXXXXX\r\0)    // X = ASCII of char
 int ci = 0;
 boolean doorState = false;
-int unlockEvent;
 int lockEvent;
 void(* resetFunc) (void) = 0;
 
@@ -107,9 +106,7 @@ void process_code() {
 void check_IDAccess(){
       if(isUser() >= 0){
 //        writeLOG(pupa[isUser()].member_name);
-        if(doorState){
-          t.stop(lockEvent);
-        }
+        
         unlock_door();
       }else{
         LEDprint("Denied");
@@ -121,6 +118,9 @@ void check_IDAccess(){
 }
 
 void unlock_door(){
+  if(doorState){
+    t.stop(lockEvent);
+  }
   digitalWrite(DOOR,HIGH);
   doorState = true;
   LEDprint(pupa[isUser()].member_name);
