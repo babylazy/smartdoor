@@ -1,5 +1,5 @@
-// include timer , activity log(inactive) , unlock button , reset button
-
+// use reset pin instead function reset and change controller pin
+#include <Ethernet.h>
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -12,15 +12,25 @@
 #define OLED_RESET 4
 Adafruit_SSD1306 display(OLED_RESET);
 
+ // the media access control (ethernet hardware) address for the shield:
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };  
+//the IP address for the shield:
+byte ip[] = { 10, 0, 0, 177 };    
+// the router's gateway address:
+byte gateway[] = { 10, 0, 0, 1 };
+// the subnet:
+byte subnet[] = { 255, 255, 0, 0 };
+// telnet defaults to port 23
+EthernetServer server = EthernetServer(23);
+
 Timer t;
 tmElements_t tm;
 File sdcard;
 //File activity;
 
 #define MEMBER 20
-#define DOOR 5
-#define Button 6
-#define RESET 7
+#define DOOR 22
+#define Button 24
 #define FILE_ID "idaccess.txt"
 #define FILE_LOG "activitylog.txt"
 
@@ -34,11 +44,15 @@ byte code[12];  //10+2 XXXXXXXXXX\r\0)    // X = ASCII of char
 int ci = 0;
 boolean doorState = false;
 int lockEvent;
-void(* resetFunc) (void) = 0;
 
 void setup() {
   Serial.begin(9600); 
   Serial1.begin(9600);
+  
+  //initialize the ethernet device
+  Ethernet.begin(mac, ip, gateway, subnet);
+  server.begin();
+
   //setup OLED
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.display();
@@ -53,7 +67,6 @@ void setup() {
   //set pin for controlling RFID
   pinMode(DOOR , OUTPUT);
   pinMode(Button, INPUT);
-  pinMode(RESET, INPUT);
 }
 
 unsigned long rfid_stamp = 0;
@@ -63,7 +76,6 @@ void loop(){
   t.update();
   updateTime(tm.Minute);
   unlockButton();
-  resetButton();
   //rfid
   byte bytesRead = 0;
   byte val = 0;
@@ -149,13 +161,6 @@ void unlockButton(){
     unlock_door();
   }
 }
-void resetButton(){
-  int resetState = digitalRead(RESET);
-  if(resetState == HIGH){
-    resetFunc();
-  }
-}
-
 
 void sdcard_process(){
     if(!SD.begin(4)){
