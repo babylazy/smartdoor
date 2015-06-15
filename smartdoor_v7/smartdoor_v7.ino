@@ -1,14 +1,14 @@
 // use all function of activitylog and active add member function and add function to show denied code for 5 sec
 // file name's max length is 8.3
-#include <Ethernet.h>
 #include <SPI.h>
 #include <Wire.h>
+#include <Ethernet.h>
+#include <Timer.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Time.h>
 #include <DS1307RTC.h>
 #include <SD.h>
-#include <Timer.h>
 
 #define OLED_RESET 4
 #define PREFIX_LEN 2
@@ -112,6 +112,9 @@ void process_server(){
     activeClient = client;
   }
   int done = 0;
+  if(activeClient == false){
+    done = 1;
+  }
   while(activeClient.available() > 0 && !done) {
     done = process_command(activeClient.read());
   }
@@ -434,7 +437,7 @@ void LEDprint(char *text){
     display.setCursor(30, 40);
     display.println("Denied");
     display.display();
-  }else if(isUser > 0){
+  }else if(isUser() > 0){
       display.setCursor(30, 17);
       display.println("Hello");
       display.display();
