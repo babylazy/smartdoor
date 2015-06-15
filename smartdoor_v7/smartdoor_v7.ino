@@ -28,7 +28,7 @@ EthernetClient activeClient;
 Timer t;
 tmElements_t tm;
 File sdcard;
-File activity;
+//File activity;
 
 #define MEMBER 20
 #define DOOR 22
@@ -112,9 +112,6 @@ void process_server(){
     activeClient = client;
   }
   int done = 0;
-  if(activeClient == false){
-    done = 1;
-  }
   while(activeClient.available() > 0 && !done) {
     done = process_command(activeClient.read());
   }
@@ -241,10 +238,10 @@ void unlock_door(char* type){
   doorState = true;
   if(!strcmp(type,"card")){
     LEDprint(pupa[isUser()].member_name);
-    writeLOG(pupa[isUser()].member_name);
+//    writeLOG(pupa[isUser()].member_name);
   }else if(!strcmp(type,"button")){
     LEDprint("UNLOCK   by SWITCH");
-    writeLOG("unlock by switch");
+//    writeLOG("unlock by switch");
   }
   Serial.println("The door is unlock.");
   lockEvent = t.after(5000 , lock_door);
@@ -288,37 +285,37 @@ void sdcard_process(){
       }
     }
     
-    if(SD.exists(FILE_LOG)){
-      Serial.print("Founded ");
-      Serial.println(FILE_LOG);      
-    }else{
-      Serial.print("Didn't found ");
-      Serial.println(FILE_LOG);
-      activity = SD.open(FILE_LOG,FILE_WRITE);
-      if(activity){
-        Serial.print("Already create ");
-        Serial.println(FILE_LOG);
-        activity.close();
-      }
-    }
+//    if(SD.exists(FILE_LOG)){
+//      Serial.print("Founded ");
+//      Serial.println(FILE_LOG);      
+//    }else{
+//      Serial.print("Didn't found ");
+//      Serial.println(FILE_LOG);
+//      activity = SD.open(FILE_LOG,FILE_WRITE);
+//      if(activity){
+//        Serial.print("Already create ");
+//        Serial.println(FILE_LOG);
+//        activity.close();
+//      }
+//    }
 }
-void writeLOG(char *username){
-    activity = SD.open(FILE_LOG,FILE_WRITE);
-    activity.print(tm.Day); 
-    activity.write('/');
-    activity.print(tm.Month); 
-    activity.write('/'); 
-    activity.print(tmYearToCalendar(tm.Year));
-    activity.print("      ");
-    activity.print(num2digit(tm.Hour));  
-    activity.write(':');
-    activity.print(num2digit(tm.Minute));
-    activity.print("      ");
-    activity.print((char*)code);
-    activity.print("      ");
-    activity.println(username);
-    activity.close();
-}
+//void writeLOG(char *username){
+//    activity = SD.open(FILE_LOG,FILE_WRITE);
+//    activity.print(tm.Day); 
+//    activity.write('/');
+//    activity.print(tm.Month); 
+//    activity.write('/'); 
+//    activity.print(tmYearToCalendar(tm.Year));
+//    activity.print("      ");
+//    activity.print(num2digit(tm.Hour));  
+//    activity.write(':');
+//    activity.print(num2digit(tm.Minute));
+//    activity.print("      ");
+//    activity.print((char*)code);
+//    activity.print("      ");
+//    activity.println(username);
+//    activity.close();
+//}
 char *num2digit(int num){
   char digit[2];
     if(num < 9){
@@ -437,14 +434,16 @@ void LEDprint(char *text){
     display.setCursor(30, 40);
     display.println("Denied");
     display.display();
-  }else if(isUser() > 0){
-      display.setCursor(30, 17);
-      display.println("Hello");
-      display.display();
-      display.setCursor(30, 40);
-      display.println(text);
-      display.display();
-  }else{
+  }
+//  else if(isUser() > 0){
+//      display.setCursor(30, 17);
+//      display.println("Hello");
+//      display.display();
+//      display.setCursor(30, 40);
+//      display.println(text);
+//      display.display();
+//  }
+  else{
       display.setCursor(30, 17);
       display.println(text);
       display.display();
