@@ -28,9 +28,9 @@ EthernetClient activeClient;
 Timer t;
 tmElements_t tm;
 File sdcard;
-//File activity;
+File activity;
 
-#define MEMBER 20
+#define MEMBER 30
 #define DOOR 22
 #define Button 24
 #define FILE_ID "idaccess.txt"
@@ -38,7 +38,7 @@ File sdcard;
 
 typedef struct{
     char member_id[12];
-    char member_name[32];
+    char member_name[15];
 }rfid;
 
 rfid pupa[MEMBER]; // pathern -> "<member_id> <member_name>\r\n" 
@@ -71,23 +71,20 @@ void setup() {
   
   //set pin for controlling RFID
   pinMode(DOOR , OUTPUT);
-  pinMode(Button, INPUT);
+  pinMode(Button , INPUT);
 }
 
 unsigned long rfid_stamp = 0;
-unsigned long serial2_stamp = 0;
 
 void loop(){
   t.update();
   updateTime(tm.Minute);
   unlockButton();
-  process_rfid();
   process_server();
 }  
-
-byte bytesRead = 0;
-byte val = 0;
-void process_rfid(){
+void serialEvent1(){
+  byte bytesRead = 0;
+  byte val = 0;
   while(Serial1.available() > 0 && bytesRead < 16) { //make sure while not run indefinitely
       val = Serial1.read();
       bytesRead++;        
@@ -141,9 +138,9 @@ int process_command(char tmp){
     return 1;
   }
   switch(cmd[0]){
-    case '1' : show_member(); return 1; break;
-    case '2' : add_member(strcut(cmd,PREFIX_LEN,strlen(cmd))); return 1; break;
-    case '3' : remove_member(strcut(cmd,PREFIX_LEN,strlen(cmd))); return 1; break;
+    case '1' : show_member();  return 1; break;
+    case '2' : add_member(strcut(cmd,PREFIX_LEN,strlen(cmd)));  return 1; break;
+    case '3' : remove_member(strcut(cmd,PREFIX_LEN,strlen(cmd)));  return 1; break;
     default  : activeClient.println("Unknown Command!!!");
                activeClient.println("command ""help"" --> show how to command ");
                return 1; break;
@@ -161,25 +158,25 @@ void server_print_command(){
 }
 
 void show_member(){
-    
-    server.println("Member : ");
+    activeClient.println("Member : ");
     for(int i = 0 ; i < MEMBER; i++ ){
       if(strcmp(pupa[i].member_id,"")){
         activeClient.print("No.");
         activeClient.print(i);
         activeClient.print(": ");
-        activeClient.print(strcut(pupa[i].member_id,0,strlen(pupa[i].member_id)-1));  //remove '\r'
+        activeClient.print(trimwhitespace(pupa[i].member_id));  //remove '\r'
         activeClient.print(" ");
         activeClient.println(pupa[i].member_name);
       }
     }
-    server.println("=======================");
+    activeClient.println("=======================");
+    activeClient.println("Show member Done!!");
 }
 
 void add_member(char* str){
   Serial.print("add : ");
   Serial.println(str);
-  if(strcmp(str,"")){
+  if(strlen(str) >= 10 ){
     sdcard = SD.open(FILE_ID,FILE_WRITE);
     sdcard.println(str);
     sdcard.close();
@@ -190,11 +187,32 @@ void add_member(char* str){
     Serial.println("Adding member Fail!!");
     activeClient.println("Adding member Fail!!");
   }
-  
+  activeClient.print("Adding  ");
+  activeClient.print(trimwhitespace(str));
+  activeClient.println("  Done!!");
 }
 
-void remove_member(char* tmp){
-  
+void remove_member(char* str){
+  int member_index = isUser(str);
+  if(member_index < 0){
+    activeClient.println("Fail to delete!!");
+    return;
+  }
+  SD.remove(FILE_ID);
+  for(int i = member_index; i+1 < MEMBER ; i++){
+    if(strcmp(pupa[i+1].member_id, 0 )){
+      strcpy(pupa[i].member_id, pupa[i+1].member_id);
+      strcpy(pupa[i].member_name, pupa[i+1].member_name);
+    }else{
+      strcpy(pupa[i].member_id, 0);
+      strcpy(pupa[i].member_name, 0);
+    }
+  }
+  write_file(FILE_ID);
+  activeClient.print("Deleting  ");
+  activeClient.print(trimwhitespace(str));
+  activeClient.println("  Done!!");
+   
 }
    
 void process_code() {
@@ -211,18 +229,17 @@ void process_code() {
     rfid_stamp = millis();
     Serial.print("Code : ");
     Serial.println((char*)code);
-    Serial.println("Already read RFID");
     check_IDAccess();
   }
 }
 
 void check_IDAccess(){
-      if(isUser() >= 0){
-        Serial.println("ACCESS Accept");
+      if(isUser((char*)code) >= 0){
         unlock_door("card");
       }else{
         LEDprint("Denied");
         Serial.println("ACCESS Denied");
+        writeLOG("Unknown User",(char*)code);
         delay(1000);
         LEDprint((char*)code);
         delay(5000);
@@ -237,11 +254,15 @@ void unlock_door(char* type){
   digitalWrite(DOOR,HIGH);
   doorState = true;
   if(!strcmp(type,"card")){
-    LEDprint(pupa[isUser()].member_name);
-//    writeLOG(pupa[isUser()].member_name);
+    Serial.print("Access accept : ");
+    Serial.println(pupa[isUser((char*)code)].member_name);
+    Serial.println();
+    LEDprint(pupa[isUser((char*)code)].member_name);
+    writeLOG(pupa[isUser((char*)code)].member_name,(char*)code);
   }else if(!strcmp(type,"button")){
-    LEDprint("UNLOCK   by SWITCH");
-//    writeLOG("unlock by switch");
+    Serial.println("unlock by switch\n");
+    LEDprint("UNLOCK by SWITCH");
+    writeLOG("Member","unlock by switch");
   }
   Serial.println("The door is unlock.");
   lockEvent = t.after(5000 , lock_door);
@@ -253,13 +274,16 @@ void lock_door(){
   LEDprint("reset");
 }
 
-int isUser(){
+int isUser(char *str){
+  char *user = trimwhitespace(str);
   for(int i =  0 ; i < MEMBER ; i++){
-      if(!strcmp(pupa[i].member_id,(char*)code) && strcmp(pupa[i].member_id,"")){
+    char *pupa_name = trimwhitespace(pupa[i].member_name);
+    char *pupa_id   = trimwhitespace(pupa[i].member_id);
+      if((!strcmp(pupa_id,user) || !strcmp(pupa_name,user)) && strcmp(pupa_id,"")){
           return i;
       }
   }
-  Serial.println("Cannot find id");
+  Serial.println("Cannot find id\n");
   return -1;
 }
 void unlockButton(){
@@ -270,6 +294,20 @@ void unlockButton(){
 }
 
 void sdcard_process(){
+  
+    if(SD.exists(FILE_LOG)){
+      Serial.print("Founded ");
+      Serial.println(FILE_LOG);      
+    }else{
+      Serial.print("Didn't found ");
+      Serial.println(FILE_LOG);
+      activity = SD.open(FILE_LOG,FILE_WRITE);
+      if(activity){
+        Serial.print("Already create ");
+        Serial.println(FILE_LOG);
+        activity.close();
+      }
+    }
     
     if(SD.exists(FILE_ID)){
       Serial.print("Founded ");
@@ -282,48 +320,9 @@ void sdcard_process(){
       if(sdcard){
         Serial.print("Already create ");
         Serial.println(FILE_ID);
+        sdcard.close();
       }
     }
-    
-//    if(SD.exists(FILE_LOG)){
-//      Serial.print("Founded ");
-//      Serial.println(FILE_LOG);      
-//    }else{
-//      Serial.print("Didn't found ");
-//      Serial.println(FILE_LOG);
-//      activity = SD.open(FILE_LOG,FILE_WRITE);
-//      if(activity){
-//        Serial.print("Already create ");
-//        Serial.println(FILE_LOG);
-//        activity.close();
-//      }
-//    }
-}
-//void writeLOG(char *username){
-//    activity = SD.open(FILE_LOG,FILE_WRITE);
-//    activity.print(tm.Day); 
-//    activity.write('/');
-//    activity.print(tm.Month); 
-//    activity.write('/'); 
-//    activity.print(tmYearToCalendar(tm.Year));
-//    activity.print("      ");
-//    activity.print(num2digit(tm.Hour));  
-//    activity.write(':');
-//    activity.print(num2digit(tm.Minute));
-//    activity.print("      ");
-//    activity.print((char*)code);
-//    activity.print("      ");
-//    activity.println(username);
-//    activity.close();
-//}
-char *num2digit(int num){
-  char digit[2];
-    if(num < 9){
-      digit[0] = '0';
-      digit[1] = (char)num;
-      return digit;
-    }
-    return (char*)num;
 }
 
 void read_file(char *path){
@@ -372,6 +371,46 @@ void read_file(char *path){
       }
     }
     Serial.println("=========================");
+}
+
+void write_file(char *path){
+  sdcard = SD.open(path,FILE_WRITE);
+  for(int i = 0 ; i < MEMBER ; i++){
+    if(strcmp(trimwhitespace(pupa[i].member_id),"")){
+      sdcard.print(trimwhitespace(pupa[i].member_id));
+      sdcard.print(" ");
+      sdcard.println(pupa[i].member_name);
+    }
+  }
+  sdcard.close();
+}
+
+void writeLOG(char *username,char *id){
+    activity = SD.open(FILE_LOG,FILE_WRITE);
+    activity.print(tm.Day); 
+    activity.write('/');
+    activity.print(tm.Month); 
+    activity.write('/'); 
+    activity.print(tmYearToCalendar(tm.Year));
+    activity.print("   ");
+    activity.print(tm.Hour);  
+    activity.write(':');
+    activity.print(tm.Minute);
+    activity.print("   ");
+    activity.print(id);
+    activity.print("   ");
+    activity.println(username);
+    activity.close();
+}
+
+char *num2digit(int num){
+  char digit[2];
+    if(num < 9){
+      digit[0] = '0';
+      digit[1] = (char)num;
+      return digit;
+    }
+    return (char*)num;
 }
 
 void print2digits(int number) {
@@ -435,16 +474,16 @@ void LEDprint(char *text){
     display.println("Denied");
     display.display();
   }
-//  else if(isUser() > 0){
-//      display.setCursor(30, 17);
-//      display.println("Hello");
-//      display.display();
-//      display.setCursor(30, 40);
-//      display.println(text);
-//      display.display();
-//  }
-  else{
+  else if(isUser((char*)code) >= 0 && strcmp((char*)code,"")){
       display.setCursor(30, 17);
+      display.println("Hello");
+      display.display();
+      display.setCursor(30, 40);
+      display.println(text);
+      display.display();
+  }
+  else{
+      display.setCursor(0, 17);
       display.println(text);
       display.display();
   }
