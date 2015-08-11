@@ -1,4 +1,4 @@
-// use all function of activitylog and active add member function and add function to show denied code for 5 sec
+// add set delay time function
 // file name's max length is 8.3
 #include <SPI.h>
 #include <Wire.h>
@@ -36,6 +36,7 @@ File activity;
 #define FILE_ID "idaccess.txt"
 #define FILE_LOG "activity.txt"
 
+
 typedef struct{
     char member_id[12];
     char member_name[15];
@@ -46,6 +47,7 @@ byte code[12];  //10+2 XXXXXXXXXX\r\0)    // X = ASCII of char
 int ci = 0;
 boolean doorState = false;
 int lockEvent;
+unsigned long delayTime = 2000; // time in ms
 
 void setup() {
   Serial.begin(9600); 
@@ -141,6 +143,8 @@ int process_command(char tmp){
     case '1' : show_member();  return 1; break;
     case '2' : add_member(strcut(cmd,PREFIX_LEN,strlen(cmd)));  return 1; break;
     case '3' : remove_member(strcut(cmd,PREFIX_LEN,strlen(cmd)));  return 1; break;
+    case '4' : set_delaytime(strcut(cmd,PREFIX_LEN,strlen(cmd))); return 1; break;
+    case '5' : show_delaytime(); return 1; break;
     default  : activeClient.println("Unknown Command!!!");
                activeClient.println("command ""help"" --> show how to command ");
                return 1; break;
@@ -154,6 +158,8 @@ void server_print_command(){
   activeClient.println("Show member   : 1_");
   activeClient.println("Add  member   : 2_<rfid_code> <name>");
   activeClient.println("Remove member : 3_<name> or 3_<rfid_code>");
+  activeClient.println("Set delayTime : 4_<time>");
+  activeClient.println("Show delayTime : 5_");
   activeClient.println("==========================================");
 }
 
@@ -214,7 +220,23 @@ void remove_member(char* str){
   activeClient.println("  Done!!");
    
 }
-   
+
+void set_delaytime(char* str){
+  long time_tmp = str2long(str);
+  if(time_tmp > 0){
+    delayTime = time_tmp;
+    activeClient.println("Change DelayTime Done!!");
+    show_delaytime();
+  }else{
+    activeClient.println("DelayTime must be more than 0 !!");
+  }
+}
+
+void show_delaytime(){
+  activeClient.print("Delay Time : ");
+  activeClient.println(delayTime);
+}
+
 void process_code() {
   byte checksum = hexstr2b(code[10], code[11]);
   byte test = hexstr2b(code[0], code[1]);
@@ -265,7 +287,7 @@ void unlock_door(char* type){
     writeLOG("Member","unlock by switch");
   }
   Serial.println("The door is unlock.");
-  lockEvent = t.after(5000 , lock_door);
+  lockEvent = t.after(delayTime , lock_door);
 }
 void lock_door(){
   digitalWrite(DOOR,LOW);
@@ -539,4 +561,19 @@ char *strcut(char *str , int head , int tail){
 //  Serial.println(str);
   return str;
 }
-  
+
+long str2long(char* str){
+  long value = 0;
+  int i,j;
+  for(i = strlen(str)-1,j = 0 ; i >= 0 ; i-- ,j++){
+      value += (str[i] - '0')* power10(j);
+  }
+  return value;
+}
+long power10(int n){
+  long sum = 1 ;
+  for(int i = 0 ; i < n ; i++){
+    sum *= 10;
+  }
+  return sum;
+}
